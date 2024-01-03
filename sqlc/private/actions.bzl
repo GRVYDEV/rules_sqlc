@@ -63,6 +63,11 @@ def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
                     db_type = type_,
                 ))
 
+    sql_package = "database/sql"
+
+    if params.sql_package:
+        sql_package = params.sql_package
+
     if versions.is_at_least("1.5.0", toolchain_version):
         config = struct(
             version = "1",
@@ -79,7 +84,7 @@ def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
                 # TODO(Windows) Figure out path handling for windows
                 queries = ["{}/{}".format(back_to_root, p) for p in queries],
                 schema = ["{}/{}".format(back_to_root, p) for p in schemas],
-                sql_package = "pgx/v5"
+                sql_package = sql_package,
             )],
         ).to_json()
     else:
@@ -97,6 +102,7 @@ def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
                 # TODO(Windows) Figure out path handling for windows
                 queries = ["{}/{}".format(back_to_root, p) for p in queries],
                 schema = ["{}/{}".format(back_to_root, p) for p in schemas],
+                sql_package = sql_package,
             )],
         ).to_json()
 
