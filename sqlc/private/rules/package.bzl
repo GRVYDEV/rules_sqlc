@@ -18,7 +18,8 @@ def _sqlc_package_impl(ctx):
     # For output files, we use a unique per-target prefix to avoid conflict
     # with files from other targets in the same package (which would otherwise
     # be placed into the same package directory)
-    target_prefix = ctx.label.name + "%/"
+    # target_prefix = ctx.label.name + "%/"
+    target_prefix = ""
 
     # Despite the docs claiming that you can pass in only a single file or
     # multiple paths, the code shows that you can send multiple files, which is
