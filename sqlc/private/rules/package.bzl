@@ -118,6 +118,11 @@ sqlc_package = rule(
             default = False,
             doc = "If true, slices returned by :many queries will be empty instead of nil",
         ),
+        "sql_package": attr.string(
+            default = "database/sql",
+            doc = "Either pgx/v4, pgx/v5 or database/sql.",
+            values = ["database/sql", "pgx/v5", "pgx/v4"],
+        ),
     },
     doc = """
 sqlc generates **fully type-safe idiomatic Go code** from SQL.
