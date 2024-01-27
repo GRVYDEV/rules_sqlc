@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//sqlc/private:actions.bzl", "sqlc_compile", "sqlc_configure")
+load("//sqlc/private:actions.bzl", "sqlc_compile", "sqlc_configure", "generate_mod_file")
 
 def _sqlc_package_impl(ctx):
     # For output files, we use a unique per-target prefix to avoid conflict
@@ -69,6 +69,12 @@ def _sqlc_package_impl(ctx):
         out = outputs,
     )
 
+    if ctx.attr.go_module_name != "":
+      mod_file = ctx.actions.declare_file(target_prefix + "go.mod")
+      outputs.append(mod_file)
+      generate_mod_file(ctx, json_config, config_path_depth, ctx.attr.go_module_name, [mod_file])
+    
+
     # TODO(V2) Investigate direct compilation by embedding a go_library rule
     return struct(providers = [
         DefaultInfo(
@@ -124,6 +130,13 @@ sqlc_package = rule(
             doc = "Either pgx/v4, pgx/v5 or database/sql.",
             values = ["database/sql", "pgx/v5", "pgx/v4"],
         ),
+        "go_module_name": attr.string(
+            default = "",
+            doc = "The go module name to be generated for the package",
+        ),
+        "_go_context_data": attr.label(
+            default = "@io_bazel_rules_go//:go_context_data",
+        ),
     },
     doc = """
 sqlc generates **fully type-safe idiomatic Go code** from SQL.
@@ -139,5 +152,5 @@ Example:
 """,
     executable = False,
     output_to_genfiles = True,
-    toolchains = ["@com_plezentek_rules_sqlc//sqlc:toolchain"],
+    toolchains = ["@com_plezentek_rules_sqlc//sqlc:toolchain", "@io_bazel_rules_go//go:toolchain"],
 )

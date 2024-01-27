@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("@bazel_skylib//lib:versions.bzl", "versions")
+load("@io_bazel_rules_go//go:def.bzl", "go_context")
 
 def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
     """Output a JSON file used to control the execution of the SQLC binary"""
@@ -108,8 +109,27 @@ def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
 
     ctx.actions.write(out, config)
 
+
+def generate_mod_file(ctx, config_file, config_path_depth, module_name, out):
+    """GENERATE A GO MOD FILE FOR USE WITH THE REPLACE DIRECTIVE"""
+    go = go_context(ctx)
+    back_to_root = "/".join([".."] * config_path_depth)
+    cmd = "cd {} && {}/{} mod init {}".format(
+        config_file.dirname, 
+        back_to_root, 
+        go.go.path, 
+        module_name,
+    )
+    ctx.actions.run_shell(
+      tools = [go.go],
+      outputs = out,
+      command = cmd,
+      mnemonic = "SQLCModGenerate",
+    )
+  
+
 def sqlc_compile(ctx, config_file, config_path_depth, srcs, out):
-    """Compile a database library from SQLC config and sources"""
+    """COMPILE A DATABASE LIBRARY FROM SQLC CONFIG AND SOURCES"""
 
     toolchain = ctx.toolchains["@com_plezentek_rules_sqlc//sqlc:toolchain"]
 
