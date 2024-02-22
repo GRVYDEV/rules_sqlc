@@ -15,7 +15,7 @@
 load("@bazel_skylib//lib:versions.bzl", "versions")
 load("@io_bazel_rules_go//go:def.bzl", "go_context")
 
-def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
+def sqlc_configure_v1(ctx, params, queries, schemas, out, config_path_depth):
     """Output a JSON file used to control the execution of the SQLC binary"""
 
     # The following hackery is because our toolchain executable needs to be run
@@ -104,6 +104,115 @@ def sqlc_configure(ctx, params, queries, schemas, out, config_path_depth):
                 queries = ["{}/{}".format(back_to_root, p) for p in queries],
                 schema = ["{}/{}".format(back_to_root, p) for p in schemas],
                 sql_package = sql_package,
+            )],
+        ).to_json()
+
+    ctx.actions.write(out, config)
+
+def sqlc_configure_v2(ctx, params, queries, schemas, out, config_path_depth):
+    """Output a JSON file used to control the execution of the SQLC binary"""
+
+    # The following hackery is because our toolchain executable needs to be run
+    # from the same directory as the config file, which means we need to do
+    # path smashing to make all paths relative to this location.
+    # TODO(Windows) Figure out path handling for windows
+    back_to_root = "/".join([".."] * config_path_depth)
+
+    # We check the version of the toolchain we're using so that we support the
+    # proper features.
+    toolchain = ctx.toolchains["@com_plezentek_rules_sqlc//sqlc:toolchain"]
+    toolchain_version = toolchain.release.version
+
+    # Here we convert our overrides attribute to something that sqlc can
+    # understand
+    overrides = []
+    for type_, override in params.overrides.items():
+        nullable = type_.endswith(":nullable")
+        if nullable:
+            # Nullable overrides are ignored for older versions, since they
+            # aren't supported
+            if versions.is_at_least("1.5.0", toolchain_version):
+                type_ = type_.split(":")[0]
+                if "." in type_:
+                    overrides.append(struct(
+                        go_type = override.split(":")[0],
+                        column = type_,
+                        nullable = nullable,
+                    ))
+                else:
+                    overrides.append(struct(
+                        go_type = override.split(":")[0],
+                        db_type = type_,
+                        nullable = nullable,
+                    ))
+        else:
+            type_ = type_.split(":")[0]
+            if "." in type_:
+                overrides.append(struct(
+                    go_type = override.split(":")[0],
+                    column = type_,
+                ))
+            else:
+                overrides.append(struct(
+                    go_type = override.split(":")[0],
+                    db_type = type_,
+                ))
+
+    sql_package = "database/sql"
+
+    if params.sql_package:
+        sql_package = params.sql_package
+
+
+
+    if versions.is_at_least("1.5.0", toolchain_version):
+        config = struct(
+            version = "2",
+            sql = [struct(
+                name = params.package or ctx.label.name,
+                engine = params.engine,
+                gen = struct(
+                  go = struct(
+                    package = params.package or ctx.label.name,
+                    sql_package = sql_package,
+                    emit_empty_slices = params.emit_empty_slices,
+                    emit_exact_table_names = params.emit_exact_table_names,
+                    emit_interface = params.emit_interface,
+                    emit_json_tags = params.emit_json_tags,
+                    emit_prepared_queries = params.emit_prepared_queries,
+                    overrides = overrides,
+                    out = ".",
+                  ),
+                ),
+                # TODO(Windows) Figure out path handling for windows
+                queries = ["{}/{}".format(back_to_root, p) for p in queries],
+                schema = ["{}/{}".format(back_to_root, p) for p in schemas],
+                strict_order_by = params.strict_order_by,
+            )],
+        ).to_json()
+    else:
+        config = struct(
+            version = "2",
+            sql = [struct(
+                name = params.package or ctx.label.name,
+                engine = params.engine,
+                gen = struct(
+                  go = struct(
+                    package = params.package or ctx.label.name,
+                    sql_package = sql_package,
+                    emit_empty_slices = params.emit_empty_slices,
+                    emit_exact_table_names = params.emit_exact_table_names,
+                    emit_interface = params.emit_interface,
+                    emit_json_tags = params.emit_json_tags,
+                    emit_prepared_queries = params.emit_prepared_queries,
+                    overrides = overrides,
+                    out = ".",
+                  ),
+                ),
+                # TODO(Windows) Figure out path handling for windows
+                queries = ["{}/{}".format(back_to_root, p) for p in queries],
+                schema = ["{}/{}".format(back_to_root, p) for p in schemas],
+                strict_order_by = params.strict_order_by,
             )],
         ).to_json()
 

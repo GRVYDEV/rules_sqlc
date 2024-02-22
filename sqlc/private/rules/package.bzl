@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//sqlc/private:actions.bzl", "sqlc_compile", "sqlc_configure", "generate_mod_file")
+load("//sqlc/private:actions.bzl", "sqlc_compile", "sqlc_configure_v1", "sqlc_configure_v2", "generate_mod_file")
 
 def _sqlc_package_impl(ctx):
     # For output files, we use a unique per-target prefix to avoid conflict
@@ -36,6 +36,13 @@ def _sqlc_package_impl(ctx):
 
     # TODO(Windows) Figure out path handling for windows
     config_path_depth = len(json_config.dirname.split("/"))
+
+    if ctx.attr.config_file_version == "v1":
+        sqlc_configure = sqlc_configure_v1
+    elif ctx.attr.config_file_version == "v2":
+        sqlc_configure = sqlc_configure_v2
+    else:
+        fail("Invalid config_file_version: %s" % ctx.attr.config_file_version)
 
     # This JSON config controls SQLC execution
     sqlc_configure(
@@ -71,8 +78,7 @@ def _sqlc_package_impl(ctx):
 
     if ctx.attr.go_module_name != "":
       mod_file = ctx.actions.declare_file(target_prefix + "go.mod")
-      outputs.append(mod_file)
-      generate_mod_file(ctx, json_config, config_path_depth, ctx.attr.go_module_name, [mod_file])
+      generate_mod_file(ctx, json_config, config_path_depth, ctx.attr.go_module_name, [])
     
 
     # TODO(V2) Investigate direct compilation by embedding a go_library rule
@@ -92,6 +98,11 @@ sqlc_package = rule(
         "queries": attr.label_list(
             allow_files = [".sql"],
             doc = "Source SQL query files to compile for this library",
+        ),
+        "config_file_version": attr.string(
+            default = "v1",
+            doc = "The version of the sqlc config file",
+            values = ["v1", "v2"],
         ),
         "schema": attr.label_list(
             allow_files = [".sql"],
@@ -133,6 +144,10 @@ sqlc_package = rule(
         "go_module_name": attr.string(
             default = "",
             doc = "The go module name to be generated for the package",
+        ),
+        "strict_order_by": attr.bool(
+          default = True,
+          doc = "If true, enforce strict ORDER BY",
         ),
         "_go_context_data": attr.label(
             default = "@io_bazel_rules_go//:go_context_data",
